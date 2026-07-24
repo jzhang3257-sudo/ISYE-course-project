@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+
+# Julia
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
