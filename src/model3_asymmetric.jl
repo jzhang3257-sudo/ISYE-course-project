@@ -6,7 +6,7 @@
 # with each perturbed matrix and compares the optimal plan to the baseline.
 #
 # Key metrics:
-#   (a) Plan divergence: % of arcs that differ between symmetric and asymmetric plans
+#   (a) Plan divergence: Jaccard distance between active-arc sets
 #   (b) Cost gap: % increase when evaluating the symmetric plan on asymmetric distances
 #   (c) Integrality gap: does asymmetry affect the LP relaxation quality?
 #
@@ -99,6 +99,8 @@ for δ in DELTAS
     perturbation = zeros(size(dist_sym))
     for i in 1:size(dist_sym, 1), j in 1:size(dist_sym, 2)
         if i != j
+            # Nonnegative increases reflect that road distance is normally no
+            # shorter than straight-line Haversine distance.
             eps_ij = δ * rand()  # 0 to δ
             dist_asym[i, j] = dist_sym[i, j] * (1.0 + eps_ij)
             perturbation[i, j] = eps_ij
@@ -119,14 +121,14 @@ for δ in DELTAS
     sym_active = Set((i, j) for i in 1:S, j in 1:D if y_sym[i, j] > 1e-6)
     asym_active = Set((i, j) for i in 1:S, j in 1:D if y_asym[i, j] > 1e-6)
 
-    only_sym = setdiff(sym_active, asym_active)
-    only_asym = setdiff(asym_active, sym_active)
-    common = intersect(sym_active, asym_active)
-
-    n_diverged = length(only_sym) + length(only_asym)
-    n_total = max(length(sym_active), length(asym_active))
-    divergence = n_total > 0 ? n_diverged / n_total * 100 : 0.0
-    println("  Plan divergence: $(round(divergence; digits=1))% ($n_diverged of $n_total arcs differ)")
+    # Use the symmetric difference divided by the union (Jaccard distance).
+    # This gives a clear percentage between 0% and 100%.
+    all_active = union(sym_active, asym_active)
+    changed_arcs = symdiff(sym_active, asym_active)
+    n_changed = length(changed_arcs)
+    n_union = length(all_active)
+    divergence = n_union > 0 ? n_changed / n_union * 100 : 0.0
+    println("  Plan divergence: $(round(divergence; digits=1))% ($n_changed of $n_union union arcs differ)")
 
     # (b) Cost gap: evaluate symmetric plan on asymmetric distances
     sym_on_asym_cost = sum(dist_asym[surplus_idx[i], deficit_idx[j]] * y_sym[i, j]
@@ -139,11 +141,11 @@ for δ in DELTAS
     println("  Sym plan on asym distances: $(round(Int, sym_on_asym_cost))")
     println("  Cost gap: $(round(cost_gap; digits=1))%")
 
-    # (c) Volume-weighted correlation
+    # (c) Normalized L1 flow difference
     total_volume = sum(abs(y_sym[i, j] - y_asym[i, j]) for i in 1:S, j in 1:D)
     total_flow = sum(y_sym) + sum(y_asym)
     volume_change = total_flow > 0 ? total_volume / total_flow * 100 : 0.0
-    println("  Volume-weighted change: $(round(volume_change; digits=1))%")
+    println("  Normalized flow difference: $(round(volume_change; digits=1))%")
 end
 
 println("\nDone.")

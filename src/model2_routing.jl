@@ -35,7 +35,9 @@ const K_BAR = isempty(SUBSET_NAME) ? 6 :
               SUBSET_NAME == "subset_25" ? 3 :
               SUBSET_NAME == "subset_50" ? 4 : 6
 
-# Arc sparsification: each station connects to its M nearest neighbors + depot
+# Arc sparsification: each station connects to its M nearest neighbors + depot.
+# This improves tractability but restricts the feasible route set, so the sparse
+# solution is an approximation to the full dense routing model.
 # Larger M → better solutions but slower solve times
 const M_NEIGHBORS = isempty(SUBSET_NAME) ? 15 :
                     SUBSET_NAME == "subset_10" ? 5 :

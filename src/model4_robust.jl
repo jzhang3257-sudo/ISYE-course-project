@@ -108,6 +108,10 @@ for Γ in Γ_values
             z_s + r_s[i] >= s_hat[i]
         )
 
+        # TODO: Revisit this aggregate demand constraint before the final report.
+        # When nominal demand exceeds nominal supply, requiring real flow alone
+        # to cover robust demand can make the model infeasible by construction.
+        # The unmet-demand variable is not included in this aggregate constraint.
         # Demand side: Σy ≥ Σb̄ + Γ·z_d + Σt_d
         @constraint(m, robust_demand,
             sum(y[i, j] for i in 1:S, j in 1:D) >= total_d + Γ * z_d + sum(t_d)
@@ -159,18 +163,24 @@ for Γ in Γ_values
         println("  Price of robustness: ∞ (infeasible)")
     end
 
+    # Do not request objective or variable values when no feasible solution exists.
+    has_solution = has_values(m)
+    objective = has_solution ? objective_value(m) : Inf
+    z_s_val = has_solution && Γ > 0 ? value(z_s) : NaN
+    z_d_val = has_solution && Γ > 0 ? value(z_d) : NaN
+
     push!(results, (
         Γ = Γ,
         status = status,
-        objective = objective_value(m),
+        objective = objective,
         real_cost = real_obj,
         real_bikes = real_bikes,
         dummy_bikes = dummy_bikes,
         nonzero_arcs = nonzero,
         avg_distance = avg_dist,
         all_integer = is_int,
-        z_s = Γ > 0 ? value(z_s) : 0.0,
-        z_d = Γ > 0 ? value(z_d) : 0.0
+        z_s = z_s_val,
+        z_d = z_d_val
     ))
 end
 

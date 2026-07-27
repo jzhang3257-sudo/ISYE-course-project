@@ -31,11 +31,21 @@ def main():
     departures = defaultdict(int)
     station_info = {}  # station_id -> (name, lat, lon)
 
+    raw_rows = 0
+    valid_start_ids = 0
+    valid_end_ids = 0
+    valid_both_ids = 0
+
     with open(RAW_CSV, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
+            raw_rows += 1
             start_id = row["start_station_id"].strip()
             end_id = row["end_station_id"].strip()
+
+            valid_start_ids += bool(start_id)
+            valid_end_ids += bool(end_id)
+            valid_both_ids += bool(start_id and end_id)
 
             if start_id:
                 departures[start_id] += 1
@@ -64,17 +74,28 @@ def main():
     # --- Step 2: Compute net flow ---
     all_stations = sorted(set(list(arrivals.keys()) + list(departures.keys())))
     station_data = []
+    missing_coordinate_ids = []
     for sid in all_stations:
+        # Do not assign missing stations to (0, 0), since that would create
+        # unrealistic Haversine distances. Skip them and report the count.
+        if sid not in station_info:
+            missing_coordinate_ids.append(sid)
+            continue
+
         net = arrivals.get(sid, 0) - departures.get(sid, 0)
-        name, lat, lon = station_info.get(sid, (sid, 0.0, 0.0))
+        name, lat, lon = station_info[sid]
         station_data.append((sid, name, lat, lon, net))
 
-    print(f"Total stations: {len(station_data)}")
+    print(f"Raw rows: {raw_rows}")
+    print(f"Trips with valid start station ID: {valid_start_ids}")
+    print(f"Trips with valid end station ID: {valid_end_ids}")
+    print(f"Trips with both station IDs: {valid_both_ids}")
+    print(f"Stations skipped for missing coordinates: {len(missing_coordinate_ids)}")
+    print(f"Total stations written: {len(station_data)}")
     surplus = sum(1 for s in station_data if s[4] > 0)
     deficit = sum(1 for s in station_data if s[4] < 0)
     balanced = sum(1 for s in station_data if s[4] == 0)
     print(f"Surplus: {surplus}, Deficit: {deficit}, Balanced: {balanced}")
-    print(f"Total trips: {sum(arrivals.values())}")
 
     # --- Step 3: Write stations.csv ---
     with open(OUT_STATIONS, "w", newline="", encoding="utf-8") as f:

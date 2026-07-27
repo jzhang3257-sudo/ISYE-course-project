@@ -44,6 +44,10 @@ def load_distances(path):
 
 def select_stations(stations, n):
     """Select top N stations, balanced between surplus and deficit.
+
+    These are selected stress-test instances, not random or geographically
+    representative samples. Results across sizes should be interpreted with
+    that limitation in mind.
     Takes the top n_surplus surplus stations (by net_flow descending) and
     top n_deficit deficit stations (by |net_flow| descending).
     """

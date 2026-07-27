@@ -1,5 +1,5 @@
 # model1_transportation.jl — ISyE 524 Course Project
-# Model 1: Uncapacitated Transportation Problem (LP)
+# Model 1: Transportation Problem with Unmet Demand (LP)
 #
 # Reads stations.csv and distances.csv, formulates the classic
 # transportation LP, solves with HiGHS, and verifies integrality.
@@ -43,8 +43,8 @@ set_silent(model)
 # Decision variables: y[i,j] = bikes moved from surplus i to deficit j
 @variable(model, y[1:S, 1:D] >= 0)
 
-# Handle supply shortage: add a dummy surplus node with high penalty cost.
-# This ensures feasibility while keeping the real solution meaningful.
+# Handle supply-demand imbalance with a penalized unmet-demand variable.
+# Dummy flow represents demand that is not served, not bikes physically moved.
 total_supply = sum(supply)
 total_demand = sum(demand)
 shortfall = max(0, total_demand - total_supply)
@@ -95,23 +95,18 @@ println("  (Expected: true — transportation constraint matrix is TU)")
 
 # ─── Summary statistics ──────────────────────────────────────────────────────
 nonzero_arcs = count(y_val[i, j] > 1e-6 for i in 1:S, j in 1:D)
-total_bikes_moved = sum(y_val)
-if @isdefined(y_dummy)
-    dummy_bikes = sum(value.(y_dummy))
-    total_bikes_moved += dummy_bikes
-    println("  Dummy bikes (unmet demand): $(round(Int, dummy_bikes))")
-end
+
+# Keep physical bike movements separate from unmet demand.
+real_bikes_moved = sum(y_val)
+unmet_demand = @isdefined(y_dummy) ? sum(value.(y_dummy)) : 0.0
+
 println("  Nonzero arcs: $nonzero_arcs")
-println("  Total bikes moved: $(round(Int, total_bikes_moved))")
-if total_bikes_moved > 0
-    real_obj = objective_value(model)
-    if @isdefined(y_dummy)
-        real_obj -= penalty * sum(value.(y_dummy))
-    end
-    real_bikes = total_bikes_moved - (@isdefined(y_dummy) ? sum(value.(y_dummy)) : 0)
-    if real_bikes > 0
-        println("  Avg distance per real bike: $(round(real_obj / real_bikes; digits=2)) km")
-    end
+println("  Real bikes moved: $(round(Int, real_bikes_moved))")
+println("  Unmet demand: $(round(Int, unmet_demand))")
+
+if real_bikes_moved > 0
+    real_obj = objective_value(model) - penalty * unmet_demand
+    println("  Avg distance per real bike: $(round(real_obj / real_bikes_moved; digits=2)) km")
 end
 
 # ─── Top 5 arcs by volume ────────────────────────────────────────────────────
